@@ -93,10 +93,10 @@ def Upload2Cos(File_List):
 
     BACKUP_PATH = '/backup/dbbackup/'
     if len(File_List) > 0:
-        BucketName = 'backup-bucket-1253400837'
+        BucketName = 'backup-bucket'
         logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-        secret_id = 'AKID66uWwA62g9XnxulGdnlX7VkspbEhgENK'
-        secret_key = 'wgE5sZ7VijYMk283lHyWxEIG2c4NXr35'
+        secret_id = 'none'
+        secret_key = 'none'
         region = 'ap-guangzhou'
         token = ''
         scheme = 'https'
