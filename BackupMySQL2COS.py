@@ -6,6 +6,8 @@ import logging
 import os
 import datetime
 import MySQLdb
+import urllib2
+import socket
 
 
 def BackupMySQL():
@@ -40,13 +42,21 @@ def BackupMySQL():
 
     TODAYBACKUPPATH = BACKUP_PATH
 
-    # Checking if backup folder already exists or not. If not exists will create it.
-    print "creating backup folder"
-    if not os.path.exists(TODAYBACKUPPATH):
-        os.makedirs(TODAYBACKUPPATH)
+    Logfile = 'RunningLog' + str(DATETIME) + '.log'
+    #print Logfile
+    FileHandler = open(Logfile, 'w')
+    FileHandler.write("creating backup folder\r\n")
 
+    # Checking if backup folder already exists or not. If not exists will create it.
+    #print "creating backup folder"
+    if not os.path.exists(TODAYBACKUPPATH):
+        try:
+            os.makedirs(TODAYBACKUPPATH)
+            FileHandler.write("Backup folder created successfully!\r\n")
+        except:
+            FileHandler.write("Error:Backup folder created failed!\r\n")
     # Code for checking if you want to take single database backup or assinged multiple backups in DB_NAME.
-    print "checking for databases."
+    #print "checking for databases."
     # if os.path.exists(DB_NAME):
     #     file1 = open(DB_NAME)
     #     multi = 1
@@ -67,7 +77,7 @@ def BackupMySQL():
     #print DB_List, len(DB_List)
     for DB_Name in DB_List_Temp:
         for item in DB_Name:
-            print type(item), item
+            #print type(item), item
             if item not in ('information_schema', 'mysql', 'performance_schema', 'sys'):
                 DB_List.append(item)
     #print DB_List, len(DB_List)
@@ -81,18 +91,28 @@ def BackupMySQL():
             Backup_File_List.append(DB_Name + '-' + DATETIME + ".sql")
             dumpcmd = "mysqldump -u " + DB_USER + " -p" + DB_USER_PASSWORD + " " + DB_Name + " > " + TODAYBACKUPPATH + \
                       Backup_File_List[p - 1]
-            #print dumpcmd
             os.system(dumpcmd)
+            #BackupResult = os.popen(dumpcmd)
+            print TODAYBACKUPPATH + Backup_File_List[p - 1]
+            if os.path.exists(TODAYBACKUPPATH + Backup_File_List[p - 1]):
+                FileHandler.write("Backup database " + DB_Name + " successfully!\r\n")
+            else:
+                FileHandler.write("Error:Backup database " + DB_Name + " failed!\r\n")
+            #print "BackupResult:",  BackupResult
             p = p + 1
-    print "Backup script completed"
-    print "Your backups has been created in '" + TODAYBACKUPPATH + "' directory"
-    return Backup_File_List
+    FileHandler.write("Backup script completed\r\n")
+    FileHandler.write("Your backups has been created in '" + TODAYBACKUPPATH + "' directory\r\n")
+    FileHandler.close()
+    return Backup_File_List, Logfile
 
 
 def Upload2Cos(File_List):
-
+    #print type(File_List)
+    #print File_List[0]
     BACKUP_PATH = '/backup/dbbackup/'
-    if len(File_List) > 0:
+    FileHandler = open(File_List[1], 'a')
+    FileHandler.write("Starting upload processing\r\n")
+    if len(File_List[0]) > 0:
         BucketName = 'backup-bucket'
         logging.basicConfig(level=logging.INFO, stream=sys.stdout)
         secret_id = 'none'
@@ -102,7 +122,7 @@ def Upload2Cos(File_List):
         scheme = 'https'
         config = CosConfig(Region=region, SecretId=secret_id, SecretKey=secret_key, Token=token, Scheme=scheme)
         client = CosS3Client(config)
-        for item in File_List:
+        for item in File_List[0]:
             FileKey = item
             #TimeStamp = datetime.datetime.now().strftime('%Y%m%d%H%M%s')
             #FileKey = FileKey + '-' + TimeStamp
@@ -119,26 +139,43 @@ def Upload2Cos(File_List):
             #     )
             # print(response['ETag'])
 
-            response = client.upload_file(
-                Bucket=BucketName,
-                LocalFilePath=BACKUP_PATH + FileKey,
-                Key=FileKey,
-                PartSize=10,
-                MAXThread=10
-            )
-            os.system('rm -f ' + BACKUP_PATH + FileKey)
-    return response['ETag']
+            try:
+                response = client.upload_file(
+                    Bucket=BucketName,
+                    LocalFilePath=BACKUP_PATH + FileKey,
+                    Key=FileKey,
+                    PartSize=10,
+                    MAXThread=10
+                )
+                if response['ETag'] is None:
+                    FileHandler.write(BACKUP_PATH + FileKey + " upload successfully!\r\n")
+                    FileHandler.write(response['ETag'] + "\r\n")
+                    os.system('rm -f ' + BACKUP_PATH + FileKey)
+                else:
+                    FileHandler.write("Error:" + BACKUP_PATH + FileKey + " upload failed!\r\n")
+            except:
+                FileHandler.write("Error:" + BACKUP_PATH + FileKey + " upload failed!\r\n")
+                #FileHandler.write(response['ETag'])
+    FileHandler.close
+    return File_List[1]
 
-    #
 
-    # response = client.get_object(
-    #     Bucket='test04-123456789',
-    #     Key=file_name,
-    # )
-    # response['Body'].get_stream_to_file('output.txt')
-
-
+def ActionLogMail(message):
+    MailBody = open(message, 'r').read()
+    HostName = socket.getfqdn(socket.gethostname())
+    if MailBody.find('Error:'):
+        MailSubject = 'Warming:job MySQL2COS at ' + HostName + ' failed'
+    else:
+        MailSubject = 'Job MySQL2COS at ' + HostName + ' completed successfully'
+    Html = urllib2.urlopen("http://www.163.com").read()
+    #urllib2.urlopen("http://10.104.58.245:30592/api/message/sendEmail?token=61f51757bbdcf522fdd895c52c9a7f6d&toAddress=" + 'wenzuojing1@zy.com' + '&subject=' + MailSubject + '&content=' + MailBody)
+    # print "http://10.104.58.245:30592/api/message/sendEmail?token=61f51757bbdcf522fdd895c52c9a7f6d&toAddress=" \
+    #       + 'wenzuojing1@zy.com' + '&subject=' + MailSubject + '&content=' + MailBody
+    os.system('rm -f ' + message)
+    print Html
+    return 0
 
 if __name__ == "__main__":
     result = BackupMySQL()
-    Upload2Cos(result)
+    uploadresult = Upload2Cos(result)
+    ActionLogMail(uploadresult)
