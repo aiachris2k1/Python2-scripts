@@ -156,7 +156,7 @@ def Upload2Cos(File_List):
             except:
                 FileHandler.write("Error:" + BACKUP_PATH + FileKey + " upload failed!\r\n")
                 # FileHandler.write(response['ETag'])
-    FileHandler.close
+    FileHandler.close()
     return File_List[1]
 
 
@@ -172,7 +172,7 @@ def ActionLogMail(message):
     Mail['toAddress'] = 'wenzuojing1@zy.com'
     Mail['subject'] = MailSubject
     Mail['content']= MailBody
-    url_values = urllib.urlencode(data)
+    url_values = urllib.urlencode(Mail)
     Html = urllib2.urlopen('http://10.104.58.245:30592/api/message/sendEmail' + '?' + url_values).read()
     os.system('rm -f ' + message)
     if Html.find(":0,") < 0:
