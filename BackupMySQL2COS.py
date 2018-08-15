@@ -37,6 +37,7 @@ def BackupMySQL():
     DB_List = []
     Backup_File_List = []
     BACKUP_PATH = '/backup/dbbackup/'
+    BACKUP_PATH = '/Users/chenzhiyuan/Downloads/'
 
     # Getting current datetime to create seprate backup folder like "12012013-071334".
     DATETIME = datetime.datetime.now().strftime('%Y%m%d%H%M%s')
@@ -113,11 +114,18 @@ def Upload2Cos(File_List):
     BACKUP_PATH = '/backup/dbbackup/'
     FileHandler = open(File_List[1], 'a')
     FileHandler.write("Starting upload processing\r\n")
+    BACKUP_PATH = '/Users/chenzhiyuan/Downloads/'
+    File_List = ('uploadtest.pdf', 'uploadtest2.pdf')
     if len(File_List[0]) > 0:
         BucketName = 'backup-bucket'
         logging.basicConfig(level=logging.INFO, stream=sys.stdout)
         secret_id = 'none'
         secret_key = 'none'
+
+        BucketName = 'backup-bucket-1253400837'
+        secret_id = 'AKID66uWwA62g9XnxulGdnlX7VkspbEhgENK'
+        secret_key = 'wgE5sZ7VijYMk283lHyWxEIG2c4NXr35'
+
         region = 'ap-guangzhou'
         token = ''
         scheme = 'https'
@@ -147,7 +155,8 @@ def Upload2Cos(File_List):
                     PartSize=10,
                     MAXThread=10
                 )
-                if response['ETag'] is None:
+                print(response['ETag'])
+                if response['ETag'] is not None:
                     FileHandler.write(BACKUP_PATH + FileKey + " upload successfully!\r\n")
                     FileHandler.write(response['ETag'] + "\r\n")
                     os.system('rm -f ' + BACKUP_PATH + FileKey)
@@ -167,16 +176,18 @@ def ActionLogMail(message):
         MailSubject = 'Warming:job MySQL2COS at ' + HostName + ' failed'
     else:
         MailSubject = 'Job MySQL2COS at ' + HostName + ' completed successfully'
+    print(MailSubject)
+    print(MailBody)
     Mail = {}
     Mail['token'] = '61f51757bbdcf522fdd895c52c9a7f6d'
     Mail['toAddress'] = 'wenzuojing1@zy.com'
     Mail['subject'] = MailSubject
     Mail['content']= MailBody
     url_values = urllib.urlencode(Mail)
-    Html = urllib2.urlopen('http://10.104.58.245:30592/api/message/sendEmail' + '?' + url_values).read()
+    #Html = urllib2.urlopen('http://10.104.58.245:30592/api/message/sendEmail' + '?' + url_values).read()
     os.system('rm -f ' + message)
-    if Html.find(":0,") < 0:
-        return 1
+    #if Html.find(":0,") < 0:
+    #    return 1
     return 0
 
 
